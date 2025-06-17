@@ -1,19 +1,30 @@
 {
-  "name": "mcp",
-  "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "name": "excel-analyser-mcp",
+  "version": "1.0.3",
+  "description": "A Node.js tool to read and analyse Excel (.xlsx) files using MCP and xlsx.",
+  "main": "excel-analyser-mcp.js",
+  "bin": {
+    "excel-analyser-mcp": "./excel-analyser-mcp.js"
   },
-  "keywords": [],
-  "author": "",
+  "scripts": {
+    "test": "node read_excel_test.js"
+  },
+  "keywords": [
+    "excel",
+    "xlsx",
+    "MCP",
+    "analysis",
+    "nodejs"
+  ],
+  "author": "Amit Agrawal",
   "license": "ISC",
-  "description": "",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/excel-analyser.git"
+  },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
     "@modelcontextprotocol/sdk": "^1.8.0",
-    "express": "^5.1.0",
-    "multer": "^2.0.1",
+    "csv-parse": "^5.5.4",
     "xlsx": "^0.18.5"
   },
   "type": "module",
