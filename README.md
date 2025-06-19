@@ -1,6 +1,9 @@
 # Excel Analyser MCP
 
 [![MCP Badge](https://lobehub.com/badge/mcp/contactakagrawal-excel-analyser-mcp)](https://lobehub.com/mcp/contactakagrawal-excel-analyser-mcp)
+[![npm version](https://img.shields.io/npm/v/excel-analyser-mcp.svg)](https://www.npmjs.com/package/excel-analyser-mcp)
+[![License](https://img.shields.io/badge/license-ISC-blue.svg)](https://github.com/contactakagrawal/excel-analyser-mcp/blob/main/LICENSE)
+[![MCP Server](https://img.shields.io/badge/MCP-Server-green.svg)](https://lobehub.com)
 
 A Node.js MCP server for reading and analyzing Excel (.xlsx) and CSV (.csv) files. Designed for scalable, chunked, and column-specific data access, making it ideal for AI agents and automation workflows that need to process large datasets efficiently.
 
