@@ -179,5 +179,40 @@ To use this server with an MCP-compatible agent, add the following to your `mcp.
 
 ---
 
+## Feedback & Support
+
+We value your feedback and are committed to improving Excel Analyser MCP. Here are several ways you can reach out:
+
+### 🐛 Found a Bug?
+- **GitHub Issues**: [Report bugs here](https://github.com/contactakagrawal/excel-analyser-mcp/issues/new?assignees=&labels=bug&template=bug_report.md&title=%5BBUG%5D)
+- Please include:
+  - Steps to reproduce the issue
+  - Expected vs actual behavior
+  - File type and size (if applicable)
+  - Error messages or logs
+
+### 💡 Feature Requests & Enhancements
+- **GitHub Issues**: [Request features here](https://github.com/contactakagrawal/excel-analyser-mcp/issues/new?assignees=&labels=enhancement&template=feature_request.md&title=%5BFEATURE%5D)
+- **GitHub Discussions**: [Start a discussion](https://github.com/contactakagrawal/excel-analyser-mcp/discussions) for ideas and general feedback
+
+### 📝 General Feedback
+- **Email**: [contactakagrawal@gmail.com](mailto:contactakagrawal@gmail.com)
+- **GitHub Discussions**: [General feedback](https://github.com/contactakagrawal/excel-analyser-mcp/discussions/categories/general)
+
+### 🤝 Contributing
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for more information on how to:
+- Submit pull requests
+- Report issues
+- Suggest improvements
+- Help with documentation
+
+### ⭐ Show Your Support
+If you find this project helpful, please consider:
+- Giving it a ⭐ star on GitHub
+- Sharing it with others who might benefit
+- Contributing to the codebase
+
+---
+
 ## License
 ISC 
