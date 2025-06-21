@@ -101,6 +101,61 @@ Or configure your MCP agent to launch this file with Node.js and --stdio.
 
 ---
 
+## Example Usage
+
+Here's an example of how you can use this MCP server with an AI agent to analyze an Excel file.
+
+**Important:** The MCP server requires **absolute file paths** for security and reliability reasons.
+
+**Scenario:** You want to get a summary of `dummy_excel_file.xlsx`.
+
+**1. Initial Request to AI Agent:**
+
+> **You:** Can you analyze the file at `/home/john/documents/dummy_excel_file.xlsx` and give me the column names and the first few rows?
+
+**2. AI Agent uses the `read_excel` tool:**
+
+The agent would make a tool call similar to this:
+
+```json
+{
+  "tool_name": "read_excel",
+  "parameters": {
+    "filePath": "/home/john/documents/dummy_excel_file.xlsx"
+  }
+}
+```
+
+**3. Response from the MCP Server:**
+
+If the file is large, the server will return a preview:
+
+```json
+{
+  "preview": [
+    { "ID": 1, "Name": "John Doe", "Sales": 1500 },
+    { "ID": 2, "Name": "Jane Smith", "Sales": 2200 }
+  ],
+  "totalRows": 10500,
+  "columns": ["ID", "Name", "Sales"],
+  "message": "File is large. Returning a preview of the first 100 rows."
+}
+```
+If the file is small, the full content is returned.
+
+**4. AI Agent provides the summary:**
+
+> **Agent:** The Excel file has the following columns: `ID`, `Name`, and `Sales`. Here are the first two rows:
+>
+> *   ID: 1, Name: John Doe, Sales: 1500
+> *   ID: 2, Name: Jane Smith, Sales: 2200
+>
+> The file contains a total of 10,500 rows. You can use the `get_chunk` tool to process it in batches if needed.
+
+This example illustrates how the `read_excel` tool can be used for initial data exploration.
+
+---
+
 ## Example: mcp.json Configuration
 To use this server with an MCP-compatible agent, add the following to your `mcp.json`:
 

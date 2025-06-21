@@ -1,6 +1,6 @@
 {
   "name": "excel-analyser-mcp",
-  "version": "1.0.3",
+  "version": "1.0.7",
   "description": "A Node.js tool to read and analyse Excel (.xlsx) files using MCP and xlsx.",
   "main": "excel-analyser-mcp.js",
   "bin": {
@@ -20,7 +20,7 @@
   "license": "ISC",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/excel-analyser.git"
+    "url": "https://github.com/contactakagrawal/excel-analyser.git"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.8.0",
