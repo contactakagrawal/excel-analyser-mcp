@@ -2,6 +2,7 @@
 
 [![MCP Badge](https://lobehub.com/badge/mcp/contactakagrawal-excel-analyser-mcp)](https://lobehub.com/mcp/contactakagrawal-excel-analyser-mcp)
 [![npm version](https://img.shields.io/npm/v/excel-analyser-mcp.svg)](https://www.npmjs.com/package/excel-analyser-mcp)
+[![npm downloads](https://img.shields.io/npm/dt/excel-analyser-mcp.svg)](https://www.npmjs.com/package/excel-analyser-mcp)
 [![License](https://img.shields.io/badge/license-ISC-blue.svg)](https://github.com/contactakagrawal/excel-analyser-mcp/blob/main/LICENSE)
 [![MCP Server](https://img.shields.io/badge/MCP-Server-green.svg)](https://lobehub.com)
 

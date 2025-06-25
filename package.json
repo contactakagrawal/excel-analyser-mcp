@@ -1,6 +1,6 @@
 {
   "name": "excel-analyser-mcp",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "A Node.js tool to read and analyse Excel (.xlsx) files using MCP and xlsx.",
   "main": "excel-analyser-mcp.js",
   "bin": {
