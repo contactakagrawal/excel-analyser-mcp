@@ -1,19 +1,25 @@
 {
   "name": "excel-analyser-mcp",
-  "version": "1.0.10",
-  "description": "A Node.js tool to read and analyse Excel (.xlsx) files using MCP and xlsx.",
+  "version": "1.1.0",
+  "description": "A Node.js tool to read and analyse Excel (.xlsx), CSV (.csv), and JSON (.json) files using MCP with automatic pagination support.",
   "main": "excel-analyser-mcp.js",
   "bin": {
     "excel-analyser-mcp": "./excel-analyser-mcp.js"
   },
   "scripts": {
-    "test": "node read_excel_test.js"
+    "test": "node test-readExcelFile.js",
+    "test-json": "node test-readJsonFile.js",
+    "test-all": "node test-readExcelFile.js && node test-readJsonFile.js"
   },
   "keywords": [
     "excel",
     "xlsx",
+    "csv",
+    "json",
     "MCP",
     "analysis",
+    "pagination",
+    "chunks",
     "nodejs"
   ],
   "author": "Amit Agrawal",

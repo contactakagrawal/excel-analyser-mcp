@@ -65,7 +65,7 @@ server.tool(
               preview: data.slice(0, 100),
               totalRows: data.length,
               columns: Object.keys(data[0] || {}),
-              message: "Data is too large to return in one response. Please request specific chunks if needed."
+              message: `The sheet '${sheetName}' contains ${data.length} rows, which is too large to return at once. A preview of the first 100 rows is shown. To access the full dataset, you must make sequential calls to the 'get_chunk' tool. It is your responsibility to track the 'start' and 'limit' parameters for pagination. The 'totalRows' is provided to help you.`
             };
           } else {
             result[sheetName] = data;
@@ -94,7 +94,7 @@ server.tool(
             preview: data.slice(0, 100),
             totalRows: data.length,
             columns: Object.keys(data[0] || {}),
-            message: "Data is too large to return in one response. Please request specific chunks if needed."
+            message: `The CSV file contains ${data.length} rows, which is too large to return at once. A preview of the first 100 rows is shown. To access the full dataset, you must make sequential calls to the 'get_chunk' tool. It is your responsibility to track the 'start' and 'limit' parameters for pagination. The 'totalRows' is provided to help you.`
           };
         } else {
           result["CSV"] = data;
@@ -123,9 +123,9 @@ server.tool(
     filePath: z.string().describe("Path to the Excel or CSV file on disk (.xlsx or .csv)"),
     columns: z.array(z.string()).optional().describe("Columns to include in the output. If not specified, all columns are included."),
     start: z.number().int().nonnegative().default(0).describe("Row index to start from (0-based)"),
-    limit: z.number().int().positive().default(5000).describe("Number of rows to return in the chunk (default 5000)"),
+    limit: z.number().int().positive().default(1000).describe("Number of rows to return in the chunk (default 1000)"),
   },
-  async ({ filePath, columns, start = 0, limit = 5000 }) => {
+  async ({ filePath, columns, start, limit }) => {
     try {
       if (!filePath.endsWith('.xlsx') && !filePath.endsWith('.csv')) {
         return {
@@ -191,6 +191,185 @@ server.tool(
         content: [{
           type: "text",
           text: `Failed to read or parse file: ${error.message}`
+        }]
+      };
+    }
+  }
+);
+
+server.tool(
+  "read_json",
+  {
+    filePath: z.string().describe("Path to the JSON file on disk (.json)"),
+    fields: z.array(z.string()).optional().describe("Fields to include in the output. If not specified, all fields are included.")
+  },
+  async ({ filePath, fields }) => {
+    try {
+      // Validate file extension
+      if (!filePath.endsWith('.json')) {
+        return {
+          content: [{
+            type: "text",
+            text: `Only .json files are supported. Provided: ${filePath}`
+          }]
+        };
+      }
+      
+      // Read file from disk
+      const fs = await import('fs/promises');
+      
+      // Check if file exists
+      try {
+        await fs.access(filePath);
+      } catch {
+        return {
+          content: [{
+            type: "text",
+            text: `File does not exist: ${filePath}`
+          }]
+        };
+      }
+      
+      const fileContent = await fs.readFile(filePath, 'utf8');
+      let data = JSON.parse(fileContent);
+      
+      // Handle different JSON structures
+      if (!Array.isArray(data)) {
+        return {
+          content: [{
+            type: "text",
+            text: `JSON file must contain an array of objects. Found: ${typeof data}`
+          }]
+        };
+      }
+      
+      // Filter fields if specified
+      if (fields && fields.length > 0 && data.length > 0) {
+        data = data.map(item => {
+          const filtered = {};
+          for (const field of fields) {
+            if (item.hasOwnProperty(field)) {
+              filtered[field] = item[field];
+            }
+          }
+          return filtered;
+        });
+      }
+      
+      const CHUNK_SIZE = 1000;
+      const result = {};
+      
+      // For large data, return preview and metadata
+      if (data.length > CHUNK_SIZE) {
+        result["JSON"] = {
+          preview: data.slice(0, 100),
+          totalEntries: data.length,
+          fields: data.length > 0 ? Object.keys(data[0] || {}) : [],
+          message: `The JSON contains ${data.length} entries, which is too large to return at once. A preview of the first 100 entries is shown. To access the full dataset, you must make sequential calls to the 'get_json_chunk' tool. It is your responsibility to track the 'start' and 'limit' parameters for pagination. The 'totalEntries' is provided to help you.`
+        };
+      } else {
+        result["JSON"] = data;
+      }
+      
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result)
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{
+          type: "text",
+          text: `Failed to read or parse JSON file: ${error.message}`
+        }]
+      };
+    }
+  }
+);
+
+server.tool(
+  "get_json_chunk",
+  {
+    filePath: z.string().describe("Path to the JSON file on disk (.json)"),
+    fields: z.array(z.string()).optional().describe("Fields to include in the output. If not specified, all fields are included."),
+    start: z.number().int().nonnegative().default(0).describe("Entry index to start from (0-based)"),
+    limit: z.number().int().positive().default(1000).describe("Number of entries to return in the chunk (default 1000)"),
+  },
+  async ({ filePath, fields, start, limit }) => {
+    try {
+      // Debug: Log the actual parameters received
+      console.log(`DEBUG get_json_chunk: filePath=${filePath}, start=${start}, limit=${limit}, fields=${fields ? fields.join(',') : 'null'}`);
+      
+      if (!filePath.endsWith('.json')) {
+        return {
+          content: [{
+            type: "text",
+            text: `Only .json files are supported. Provided: ${filePath}`
+          }]
+        };
+      }
+      
+      const fs = await import('fs/promises');
+      try {
+        await fs.access(filePath);
+      } catch {
+        return {
+          content: [{
+            type: "text",
+            text: `File does not exist: ${filePath}`
+          }]
+        };
+      }
+      
+      const fileContent = await fs.readFile(filePath, 'utf8');
+      let data = JSON.parse(fileContent);
+      
+      // Handle different JSON structures
+      if (!Array.isArray(data)) {
+        return {
+          content: [{
+            type: "text",
+            text: `JSON file must contain an array of objects. Found: ${typeof data}`
+          }]
+        };
+      }
+      
+      // Filter fields if specified
+      if (fields && fields.length > 0 && data.length > 0) {
+        data = data.map(item => {
+          const filtered = {};
+          for (const field of fields) {
+            if (item.hasOwnProperty(field)) {
+              filtered[field] = item[field];
+            }
+          }
+          return filtered;
+        });
+      }
+      
+      // Get the chunk
+      console.log(`DEBUG: data.length=${data.length}, slicing from ${start} to ${start + limit}`);
+      const chunk = data.slice(start, start + limit);
+      console.log(`DEBUG: chunk.length=${chunk.length}, first item id=${chunk[0]?.id || 'N/A'}, last item id=${chunk[chunk.length - 1]?.id || 'N/A'}`);
+      
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            chunk,
+            start,
+            limit,
+            totalEntries: data.length,
+            fields: data.length > 0 ? Object.keys(data[0] || {}) : []
+          })
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{
+          type: "text",
+          text: `Failed to read or parse JSON file: ${error.message}`
         }]
       };
     }
@@ -284,6 +463,83 @@ export async function readExcelFile(filePath, columns) {
       content: [{
         type: "text",
         text: `Failed to read or parse file: ${error.message}`
+      }]
+    };
+  }
+}
+
+export async function readJsonFile(filePath, fields) {
+  try {
+    if (!filePath.endsWith('.json')) {
+      return {
+        content: [{
+          type: "text",
+          text: `Only .json files are supported. Provided: ${filePath}`
+        }]
+      };
+    }
+    
+    const fs = await import('fs/promises');
+    try {
+      await fs.access(filePath);
+    } catch {
+      return {
+        content: [{
+          type: "text",
+          text: `File does not exist: ${filePath}`
+        }]
+      };
+    }
+    
+    const fileContent = await fs.readFile(filePath, 'utf8');
+    let data = JSON.parse(fileContent);
+    
+    if (!Array.isArray(data)) {
+      return {
+        content: [{
+          type: "text",
+          text: `JSON file must contain an array of objects. Found: ${typeof data}`
+        }]
+      };
+    }
+    
+    if (fields && fields.length > 0 && data.length > 0) {
+      data = data.map(item => {
+        const filtered = {};
+        for (const field of fields) {
+          if (item.hasOwnProperty(field)) {
+            filtered[field] = item[field];
+          }
+        }
+        return filtered;
+      });
+    }
+    
+    const CHUNK_SIZE = 1000;
+    const result = {};
+    
+    if (data.length > CHUNK_SIZE) {
+      result["JSON"] = {
+        preview: data.slice(0, 100),
+        totalEntries: data.length,
+        fields: data.length > 0 ? Object.keys(data[0] || {}) : [],
+        message: `The JSON contains ${data.length} entries, which is too large to return at once. A preview of the first 100 entries is shown. To access the full dataset, you must make sequential calls to the 'get_json_chunk' tool. It is your responsibility to track the 'start' and 'limit' parameters for pagination. The 'totalEntries' is provided to help you.`
+      };
+    } else {
+      result["JSON"] = data;
+    }
+    
+    return {
+      content: [{
+        type: "text",
+        text: JSON.stringify(result)
+      }]
+    };
+  } catch (error) {
+    return {
+      content: [{
+        type: "text",
+        text: `Failed to read or parse JSON file: ${error.message}`
       }]
     };
   }
