@@ -4,6 +4,9 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import XLSX from "xlsx";
 import { parse } from "csv-parse/sync";
+import { chain } from 'stream-chain';
+import parser from 'stream-json/Parser.js';
+import streamArray from 'stream-json/streamers/StreamArray.js';
 
 const server = new McpServer({
   name: "ExcelAnalyser",
@@ -65,7 +68,7 @@ server.tool(
               preview: data.slice(0, 100),
               totalRows: data.length,
               columns: Object.keys(data[0] || {}),
-              message: `The sheet '${sheetName}' contains ${data.length} rows, which is too large to return at once. A preview of the first 100 rows is shown. To access the full dataset, you must make sequential calls to the 'get_chunk' tool. It is your responsibility to track the 'start' and 'limit' parameters for pagination. The 'totalRows' is provided to help you.`
+              message: `The sheet '${sheetName}' contains ${data.length} rows, which is too large to return at once. A preview of the first 100 rows is shown. To access the full dataset, you must make sequential calls to the 'get_chunk' tool. It is your responsibility to track the 'start' and 'limit' parameters for pagination. Please note that the 'limit' parameter must not exceed 1000. The 'totalRows' is provided to help you. For example, the first call would be get_chunk(filePath='${filePath}', start=0, limit=1000), and the second call would be get_chunk(filePath='${filePath}', start=1000, limit=1000).`
             };
           } else {
             result[sheetName] = data;
@@ -94,7 +97,7 @@ server.tool(
             preview: data.slice(0, 100),
             totalRows: data.length,
             columns: Object.keys(data[0] || {}),
-            message: `The CSV file contains ${data.length} rows, which is too large to return at once. A preview of the first 100 rows is shown. To access the full dataset, you must make sequential calls to the 'get_chunk' tool. It is your responsibility to track the 'start' and 'limit' parameters for pagination. The 'totalRows' is provided to help you.`
+            message: `The CSV file contains ${data.length} rows, which is too large to return at once. A preview of the first 100 rows is shown. To access the full dataset, you must make sequential calls to the 'get_chunk' tool. It is your responsibility to track the 'start' and 'limit' parameters for pagination. Please note that the 'limit' parameter must not exceed 1000. The 'totalRows' is provided to help you. For example, the first call would be get_chunk(filePath='${filePath}', start=0, limit=1000), and the second call would be get_chunk(filePath='${filePath}', start=1000, limit=1000).`
           };
         } else {
           result["CSV"] = data;
@@ -127,6 +130,14 @@ server.tool(
   },
   async ({ filePath, columns, start, limit }) => {
     try {
+      if (limit > 1000) {
+        return {
+          content: [{
+            type: "text",
+            text: `The 'limit' parameter cannot exceed 1000. Please adjust your request. For example, to get the first 1000 rows, use get_chunk(filePath='${filePath}', start=0, limit=1000). To get the next 1000 rows, use get_chunk(filePath='${filePath}', start=1000, limit=1000).`
+          }]
+        };
+      }
       if (!filePath.endsWith('.xlsx') && !filePath.endsWith('.csv')) {
         return {
           content: [{
@@ -204,6 +215,7 @@ server.tool(
     fields: z.array(z.string()).optional().describe("Fields to include in the output. If not specified, all fields are included.")
   },
   async ({ filePath, fields }) => {
+    const fs = await import('fs');
     try {
       // Validate file extension
       if (!filePath.endsWith('.json')) {
@@ -215,12 +227,9 @@ server.tool(
         };
       }
       
-      // Read file from disk
-      const fs = await import('fs/promises');
-      
       // Check if file exists
       try {
-        await fs.access(filePath);
+        await fs.promises.access(filePath);
       } catch {
         return {
           content: [{
@@ -229,47 +238,58 @@ server.tool(
           }]
         };
       }
-      
-      const fileContent = await fs.readFile(filePath, 'utf8');
-      let data = JSON.parse(fileContent);
-      
-      // Handle different JSON structures
-      if (!Array.isArray(data)) {
-        return {
-          content: [{
-            type: "text",
-            text: `JSON file must contain an array of objects. Found: ${typeof data}`
-          }]
-        };
-      }
-      
-      // Filter fields if specified
-      if (fields && fields.length > 0 && data.length > 0) {
-        data = data.map(item => {
-          const filtered = {};
-          for (const field of fields) {
-            if (item.hasOwnProperty(field)) {
-              filtered[field] = item[field];
+
+      const dataPromise = new Promise((resolve, reject) => {
+        const preview = [];
+        let totalEntries = 0;
+        let fieldNames = [];
+        const PREVIEW_LIMIT = 100;
+
+        const pipeline = chain([
+            fs.createReadStream(filePath),
+            new parser(),
+            new streamArray()
+        ]);
+
+        pipeline.on('data', ({ value }) => {
+            if (totalEntries === 0 && value) {
+                fieldNames = Object.keys(value);
             }
-          }
-          return filtered;
+            totalEntries++;
+
+            if (preview.length < PREVIEW_LIMIT) {
+                let item = value;
+                if (fields && fields.length > 0) {
+                    const filtered = {};
+                    for (const field of fields) {
+                        if (item.hasOwnProperty(field)) {
+                            filtered[field] = item[field];
+                        }
+                    }
+                    preview.push(filtered);
+                } else {
+                    preview.push(item);
+                }
+            }
         });
-      }
+
+        pipeline.on('end', () => {
+            resolve({ preview, totalEntries, fieldNames });
+        });
+
+        pipeline.on('error', reject);
+      });
+
+      const { preview, totalEntries, fieldNames } = await dataPromise;
       
-      const CHUNK_SIZE = 1000;
-      const result = {};
-      
-      // For large data, return preview and metadata
-      if (data.length > CHUNK_SIZE) {
-        result["JSON"] = {
-          preview: data.slice(0, 100),
-          totalEntries: data.length,
-          fields: data.length > 0 ? Object.keys(data[0] || {}) : [],
-          message: `The JSON contains ${data.length} entries, which is too large to return at once. A preview of the first 100 entries is shown. To access the full dataset, you must make sequential calls to the 'get_json_chunk' tool. It is your responsibility to track the 'start' and 'limit' parameters for pagination. The 'totalEntries' is provided to help you.`
-        };
-      } else {
-        result["JSON"] = data;
-      }
+      const result = {
+        "JSON": {
+          preview,
+          totalEntries,
+          fields: fieldNames,
+          message: `The JSON contains ${totalEntries} entries. A preview of the first ${Math.min(totalEntries, 100)} entries is shown. To access the full dataset, you must make sequential calls to the 'get_json_chunk' tool. It is your responsibility to track the 'start' and 'limit' parameters for pagination. Please note that the 'limit' parameter must not exceed 1000. The 'totalEntries' is provided to help you. For example, the first call would be get_json_chunk(filePath='${filePath}', start=0, limit=1000).`
+        }
+      };
       
       return {
         content: [{
@@ -289,6 +309,100 @@ server.tool(
 );
 
 server.tool(
+  "query_json",
+  {
+    filePath: z.string().describe("Path to the JSON file on disk (.json)"),
+    query: z.object({
+      field: z.string().describe("The field to query (e.g., 'trading_symbol')"),
+      operator: z.enum(["contains", "equals", "startsWith", "endsWith"]).describe("The query operator"),
+      value: z.string().describe("The value to match against")
+    }).describe("The query to execute on the JSON data")
+  },
+  async ({ filePath, query }) => {
+    const fs = await import('fs');
+    const MAX_RESULTS = 1000;
+    try {
+      if (!filePath.endsWith('.json')) {
+        return { content: [{ type: "text", text: `Only .json files are supported. Provided: ${filePath}` }] };
+      }
+      
+      await fs.promises.access(filePath);
+
+      const dataPromise = new Promise((resolve, reject) => {
+        const results = [];
+        let totalEntries = 0;
+
+        const pipeline = chain([
+            fs.createReadStream(filePath),
+            new parser(),
+            new streamArray()
+        ]);
+
+        pipeline.on('data', ({ value }) => {
+            totalEntries++;
+            let isMatch = false;
+            const fieldValue = value[query.field];
+
+            if (fieldValue !== undefined && fieldValue !== null) {
+              const strFieldValue = String(fieldValue);
+              switch (query.operator) {
+                case 'contains':
+                  isMatch = strFieldValue.includes(query.value);
+                  break;
+                case 'equals':
+                  isMatch = strFieldValue === query.value;
+                  break;
+                case 'startsWith':
+                  isMatch = strFieldValue.startsWith(query.value);
+                  break;
+                case 'endsWith':
+                  isMatch = strFieldValue.endsWith(query.value);
+                  break;
+              }
+            }
+            
+            if (isMatch && results.length < MAX_RESULTS) {
+                results.push(value);
+            }
+        });
+
+        pipeline.on('end', () => {
+            resolve({ results, totalEntries });
+        });
+
+        pipeline.on('error', reject);
+      });
+
+      const { results, totalEntries } = await dataPromise;
+      
+      let message = `Query returned ${results.length} matching entries.`;
+      if (results.length >= MAX_RESULTS) {
+        message += ` (Note: Results are capped at ${MAX_RESULTS}. The query may have more matches.)`;
+      }
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            matches: results,
+            matchCount: results.length,
+            totalEntriesScanned: totalEntries,
+            message: message
+          })
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{
+          type: "text",
+          text: `Failed to query JSON file: ${error.message}`
+        }]
+      };
+    }
+  }
+);
+
+server.tool(
   "get_json_chunk",
   {
     filePath: z.string().describe("Path to the JSON file on disk (.json)"),
@@ -297,9 +411,16 @@ server.tool(
     limit: z.number().int().positive().default(1000).describe("Number of entries to return in the chunk (default 1000)"),
   },
   async ({ filePath, fields, start, limit }) => {
+    const fs = await import('fs');
     try {
-      // Debug: Log the actual parameters received
-      console.log(`DEBUG get_json_chunk: filePath=${filePath}, start=${start}, limit=${limit}, fields=${fields ? fields.join(',') : 'null'}`);
+      if (limit > 1000) {
+        return {
+          content: [{
+            type: "text",
+            text: `The 'limit' parameter cannot exceed 1000. Please adjust your request. For example, to get the first 1000 entries, use get_json_chunk(filePath='${filePath}', start=0, limit=1000). To get the next 1000 entries, use get_json_chunk(filePath='${filePath}', start=1000, limit=1000).`
+          }]
+        };
+      }
       
       if (!filePath.endsWith('.json')) {
         return {
@@ -310,48 +431,45 @@ server.tool(
         };
       }
       
-      const fs = await import('fs/promises');
-      try {
-        await fs.access(filePath);
-      } catch {
-        return {
-          content: [{
-            type: "text",
-            text: `File does not exist: ${filePath}`
-          }]
-        };
-      }
+      await fs.promises.access(filePath);
       
-      const fileContent = await fs.readFile(filePath, 'utf8');
-      let data = JSON.parse(fileContent);
-      
-      // Handle different JSON structures
-      if (!Array.isArray(data)) {
-        return {
-          content: [{
-            type: "text",
-            text: `JSON file must contain an array of objects. Found: ${typeof data}`
-          }]
-        };
-      }
-      
-      // Filter fields if specified
-      if (fields && fields.length > 0 && data.length > 0) {
-        data = data.map(item => {
-          const filtered = {};
-          for (const field of fields) {
-            if (item.hasOwnProperty(field)) {
-              filtered[field] = item[field];
+      const dataPromise = new Promise((resolve, reject) => {
+        const chunk = [];
+        let totalEntries = 0;
+
+        const pipeline = chain([
+            fs.createReadStream(filePath),
+            new parser(),
+            new streamArray()
+        ]);
+
+        pipeline.on('data', ({ key, value }) => {
+            totalEntries++;
+
+            if (key >= start && key < start + limit) {
+                let item = value;
+                if (fields && fields.length > 0) {
+                    const filtered = {};
+                    for (const field of fields) {
+                        if (item.hasOwnProperty(field)) {
+                            filtered[field] = item[field];
+                        }
+                    }
+                    chunk.push(filtered);
+                } else {
+                    chunk.push(item);
+                }
             }
-          }
-          return filtered;
         });
-      }
-      
-      // Get the chunk
-      console.log(`DEBUG: data.length=${data.length}, slicing from ${start} to ${start + limit}`);
-      const chunk = data.slice(start, start + limit);
-      console.log(`DEBUG: chunk.length=${chunk.length}, first item id=${chunk[0]?.id || 'N/A'}, last item id=${chunk[chunk.length - 1]?.id || 'N/A'}`);
+
+        pipeline.on('end', () => {
+            resolve({ chunk, totalEntries });
+        });
+
+        pipeline.on('error', reject);
+      });
+
+      const { chunk, totalEntries } = await dataPromise;
       
       return {
         content: [{
@@ -360,8 +478,7 @@ server.tool(
             chunk,
             start,
             limit,
-            totalEntries: data.length,
-            fields: data.length > 0 ? Object.keys(data[0] || {}) : []
+            totalEntries: totalEntries
           })
         }]
       };
@@ -469,6 +586,7 @@ export async function readExcelFile(filePath, columns) {
 }
 
 export async function readJsonFile(filePath, fields) {
+  const fs = await import('fs');
   try {
     if (!filePath.endsWith('.json')) {
       return {
@@ -479,9 +597,8 @@ export async function readJsonFile(filePath, fields) {
       };
     }
     
-    const fs = await import('fs/promises');
     try {
-      await fs.access(filePath);
+      await fs.promises.access(filePath);
     } catch {
       return {
         content: [{
@@ -491,43 +608,57 @@ export async function readJsonFile(filePath, fields) {
       };
     }
     
-    const fileContent = await fs.readFile(filePath, 'utf8');
-    let data = JSON.parse(fileContent);
-    
-    if (!Array.isArray(data)) {
-      return {
-        content: [{
-          type: "text",
-          text: `JSON file must contain an array of objects. Found: ${typeof data}`
-        }]
-      };
-    }
-    
-    if (fields && fields.length > 0 && data.length > 0) {
-      data = data.map(item => {
-        const filtered = {};
-        for (const field of fields) {
-          if (item.hasOwnProperty(field)) {
-            filtered[field] = item[field];
+    const dataPromise = new Promise((resolve, reject) => {
+      const preview = [];
+      let totalEntries = 0;
+      let fieldNames = [];
+      const PREVIEW_LIMIT = 100;
+
+      const pipeline = chain([
+          fs.createReadStream(filePath),
+          new parser(),
+          new streamArray()
+      ]);
+
+      pipeline.on('data', ({ value }) => {
+          if (totalEntries === 0 && value) {
+              fieldNames = Object.keys(value);
           }
-        }
-        return filtered;
+          totalEntries++;
+
+          if (preview.length < PREVIEW_LIMIT) {
+              let item = value;
+              if (fields && fields.length > 0) {
+                  const filtered = {};
+                  for (const field of fields) {
+                      if (item.hasOwnProperty(field)) {
+                          filtered[field] = item[field];
+                      }
+                  }
+                  preview.push(filtered);
+              } else {
+                  preview.push(item);
+              }
+          }
       });
-    }
+
+      pipeline.on('end', () => {
+          resolve({ preview, totalEntries, fieldNames });
+      });
+
+      pipeline.on('error', reject);
+    });
+
+    const { preview, totalEntries, fieldNames } = await dataPromise;
     
-    const CHUNK_SIZE = 1000;
-    const result = {};
-    
-    if (data.length > CHUNK_SIZE) {
-      result["JSON"] = {
-        preview: data.slice(0, 100),
-        totalEntries: data.length,
-        fields: data.length > 0 ? Object.keys(data[0] || {}) : [],
-        message: `The JSON contains ${data.length} entries, which is too large to return at once. A preview of the first 100 entries is shown. To access the full dataset, you must make sequential calls to the 'get_json_chunk' tool. It is your responsibility to track the 'start' and 'limit' parameters for pagination. The 'totalEntries' is provided to help you.`
-      };
-    } else {
-      result["JSON"] = data;
-    }
+    const result = {
+      "JSON": {
+        preview,
+        totalEntries,
+        fields: fieldNames,
+        message: `The JSON contains ${totalEntries} entries. A preview of the first ${Math.min(totalEntries, 100)} entries is shown. To access the full dataset, you must make sequential calls to the 'get_json_chunk' tool. It is your responsibility to track the 'start' and 'limit' parameters for pagination. Please note that the 'limit' parameter must not exceed 1000. The 'totalEntries' is provided to help you. For example, the first call would be get_json_chunk(filePath='${filePath}', start=0, limit=1000).`
+      }
+    };
     
     return {
       content: [{

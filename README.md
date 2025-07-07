@@ -8,12 +8,17 @@
 
 A Node.js MCP server for reading and analyzing Excel (.xlsx), CSV (.csv), and JSON (.json) files. Designed for scalable, chunked, and column/field-specific data access, making it ideal for AI agents and automation workflows that need to process large datasets efficiently.
 
+## What's New in v2.0.0
+- **New `query_json` Tool**: A powerful new tool for efficiently searching large JSON files based on field values.
+- **Efficient Streaming**: All JSON tools (`read_json`, `query_json`, `get_json_chunk`) have been re-architected to use streaming. This means they can process gigabyte-sized files with minimal memory usage, preventing crashes and ensuring scalability.
+
 ## Features
 - **Read Excel/CSV/JSON files** and output all or selected columns/fields as JSON
-- **Chunked access**: Efficiently handle very large files by fetching data in configurable chunks
-- **Column/Field filtering**: Extract only the columns or fields you need
-- **Automatic pagination**: JSON files with >1000 entries are automatically paginated
-- **MCP server integration**: Expose tools for AI agents and automation
+- **Efficient Streaming**: Handle multi-gigabyte JSON files with constant, low memory usage.
+- **Powerful JSON Querying**: Quickly search and filter large JSON files without loading the entire file into memory.
+- **Chunked Access**: Process large files iteratively by fetching data in configurable chunks.
+- **Column/Field filtering**: Extract only the columns or fields you need.
+- **MCP server integration**: Expose tools for AI agents and automation.
 
 ## Getting Started
 
@@ -97,7 +102,7 @@ Or configure your MCP agent to launch this file with Node.js and --stdio.
 ---
 
 ### 3. `read_json`
-**Description:** Reads a JSON file containing an array of objects and returns a preview (first 100 entries) and metadata for large files, or the full data for small files.
+**Description:** Efficiently reads a large JSON file to provide a quick preview (first 100 entries) and metadata without loading the entire file into memory. This is the recommended first step for analyzing a new JSON file.
 
 **Parameters:**
 - `filePath` (string, required): Path to the JSON file on disk (.json)
@@ -126,15 +131,55 @@ Or configure your MCP agent to launch this file with Node.js and --stdio.
     ],
     "totalEntries": 15000,
     "fields": ["id", "name", "email", "age", "department", "salary"],
-    "message": "Data is too large to return in one response. Use get_json_chunk for paginated access."
+    "message": "Data is too large to return in one response. Use get_json_chunk for paginated access or query_json to search."
   }
 }
 ```
 
 ---
 
-### 4. `get_json_chunk`
-**Description:** Fetches a chunk of entries from a JSON file, with optional field filtering. Useful for processing large JSON files in batches with automatic pagination.
+### 4. `query_json`
+**Description:** Performs a fast, memory-efficient search on a large JSON file. It streams the file and returns all entries that match the specified query, up to a limit of 1000 results. This is the ideal tool for finding specific data within a large dataset.
+
+**Parameters:**
+- `filePath` (string, required): Path to the JSON file on disk (.json).
+- `query` (object, required): The query to execute on the JSON data.
+  - `field` (string): The field to query (e.g., 'trading_symbol').
+  - `operator` (enum): The query operator. Can be `contains`, `equals`, `startsWith`, or `endsWith`.
+  - `value` (string): The value to match against.
+
+**Returns:**
+- `{ matches: [...], matchCount, totalEntriesScanned, message }`
+
+**Example Request:**
+```json
+{
+  "filePath": "/path/to/your/large_dataset.json",
+  "query": {
+    "field": "trading_symbol",
+    "operator": "contains",
+    "value": "TITAN"
+  }
+}
+```
+
+**Example Response:**
+```json
+{
+  "matches": [
+    { "instrument_key": "NSE_EQ|INE280A01028", "trading_symbol": "TITAN" },
+    { "instrument_key": "NSE_EQ|INE280A01029", "trading_symbol": "TITANBEES" }
+  ],
+  "matchCount": 2,
+  "totalEntriesScanned": 2500000,
+  "message": "Query returned 2 matching entries."
+}
+```
+
+---
+
+### 5. `get_json_chunk`
+**Description:** Fetches a specific chunk of entries from a JSON file. This tool is designed for **iterative analysis**, where you need to process every entry in the file sequentially, one chunk at a time. It uses efficient streaming to access the requested chunk without re-reading the whole file.
 
 **Parameters:**
 - `filePath` (string, required): Path to the JSON file on disk (.json)
@@ -143,7 +188,7 @@ Or configure your MCP agent to launch this file with Node.js and --stdio.
 - `limit` (integer, optional, default 1000): Number of entries to return in the chunk
 
 **Returns:**
-- `{ chunk: [...], start, limit, totalEntries, fields }`
+- `{ chunk: [...], start, limit, totalEntries }`
 
 **Example Request:**
 ```json
@@ -165,12 +210,24 @@ Or configure your MCP agent to launch this file with Node.js and --stdio.
   ],
   "start": 0,
   "limit": 1000,
-  "totalEntries": 15000,
-  "fields": ["id", "name", "email", "age", "department", "salary", "status"]
+  "totalEntries": 15000
 }
 ```
 
 ---
+
+## How to Choose the Right JSON Tool
+
+Use this guide to select the most efficient tool for your task:
+
+- **To explore a new JSON file:**
+  - **1st:** Use `read_json`. It will give you the total number of entries, all available fields, and a preview of the first 100 entries.
+
+- **To find specific data:**
+  - **Use `query_json`**. It's the fastest and most memory-efficient way to search for entries that match a specific condition (e.g., find all users where `status` is `active`).
+
+- **To process every entry:**
+  - **Use `get_json_chunk`**. This is for when you need to perform an action on every single entry in the file, such as categorizing support tickets or performing a complex calculation. Call it in a loop, incrementing the `start` parameter, until you have processed all `totalEntries`.
 
 ## Usage with AI Agents
 - Configure your AI agent (e.g., Cursor AI, Copilot) to connect to this MCP server.
@@ -223,49 +280,72 @@ If the file is large, the server will return a preview:
 }
 ```
 
-### Analyzing a JSON File
+### Searching a Large JSON File
 
-**Scenario:** You want to analyze a large JSON dataset of employee records.
+**Scenario:** You want to find all stocks with "TITAN" in their trading symbol from a very large JSON file.
+
+**1. Initial Request to AI Agent:**
+> **You:** Can you find all entries in `/data/NSE.json` where the `trading_symbol` contains `TITAN`?
+
+**2. AI Agent uses the `query_json` tool:**
+```json
+{
+  "tool_name": "query_json",
+  "parameters": {
+    "filePath": "/data/NSE.json",
+    "query": {
+      "field": "trading_symbol",
+      "operator": "contains",
+      "value": "TITAN"
+    }
+  }
+}
+```
+
+**3. Response from the MCP Server:**
+```json
+{
+  "matches": [
+    { "instrument_key": "NSE_EQ|INE280A01028", "trading_symbol": "TITAN" }
+  ],
+  "matchCount": 1,
+  "totalEntriesScanned": 2500000,
+  "message": "Query returned 1 matching entries."
+}
+```
+
+### Analyzing a JSON File Iteratively
+
+**Scenario:** You want to analyze a large JSON dataset of employee records, chunk by chunk.
 
 **1. Initial Request to AI Agent:**
 
-> **You:** Can you analyze the employee data in `/home/john/data/employees.json` and show me the available fields?
+> **You:** Can you analyze the employee data in `/home/john/data/employees.json` and show me the first chunk?
 
-**2. AI Agent uses the `read_json` tool:**
+**2. AI Agent uses the `get_json_chunk` tool:**
 
 ```json
 {
-  "tool_name": "read_json",
+  "tool_name": "get_json_chunk",
   "parameters": {
-    "filePath": "/home/john/data/employees.json"
+    "filePath": "/home/john/data/employees.json",
+    "start": 0,
+    "limit": 1000
   }
 }
 ```
 
 **3. Response for Large JSON File:**
-
 ```json
 {
-  "JSON": {
-    "preview": [
-      { "id": 1, "name": "John Doe", "department": "Engineering", "salary": 75000 },
-      { "id": 2, "name": "Jane Smith", "department": "Marketing", "salary": 65000 }
-    ],
-    "totalEntries": 8500,
-    "fields": ["id", "name", "email", "age", "department", "salary"],
-    "message": "Data is too large to return in one response. Use get_json_chunk for paginated access."
-  }
+  "chunk": [
+    { "id": 1, "name": "John Doe", "status": "active" }
+  ],
+  "start": 0,
+  "limit": 1000,
+  "totalEntries": 15000
 }
 ```
-
-**4. AI Agent provides the summary:**
-
-> **Agent:** The JSON file contains employee records with the following fields: `id`, `name`, `email`, `age`, `department`, and `salary`. The file has 8,500 total entries. Here are the first two records:
->
-> *   ID: 1, Name: John Doe, Department: Engineering, Salary: 75000
-> *   ID: 2, Name: Jane Smith, Department: Marketing, Salary: 65000
->
-> You can use the `get_json_chunk` tool to process the data in batches for analysis.
 
 ---
 
