@@ -8,6 +8,100 @@
 
 A Node.js MCP server for reading and analyzing Excel (.xlsx), CSV (.csv), and JSON (.json) files. Supports **multiple transport protocols** (stdio, HTTP, SSE) and designed for scalable, chunked, and column/field-specific data access, making it ideal for AI agents and automation workflows that need to process large datasets efficiently.
 
+## 🚀 Quick Start - Configuration
+
+Excel Analyser MCP supports multiple transport protocols: **stdio** (npm/CLI), **HTTP streamable**, and **SSE**.
+
+### ⚡ Ready-to-Use HTTP Server (Recommended)
+The fastest way to get started! Use our deployed server without any installation:
+
+**MCP Client Configuration (HTTP - Ready to Use):**
+```json
+{
+  "mcpServers": {
+    "Excel Analyser MCP": {
+      "type": "http",
+      "url": "https://web-production-64851.up.railway.app/mcp"
+    }
+  }
+}
+```
+
+🎉 **That's it!** No installation required. Start analyzing files immediately.
+
+### NPM/Stdio Transport (Self-hosted)
+Perfect for MCP clients like Claude Desktop, Cursor, and other CLI-based integrations.
+
+**mcp.json Configuration:**
+```json
+{
+  "mcpServers": {
+    "Excel Analyser MCP": {
+      "command": "npx",
+      "args": ["-y", "excel-analyser-mcp", "--stdio"]
+    }
+  }
+}
+```
+
+### HTTP Transport (Self-hosted)
+Ideal for web applications, REST API integrations, and serverless deployments.
+
+**Start HTTP Server:**
+```bash
+# Default: runs on http://localhost:8080/mcp
+npx excel-analyser-mcp streamableHttp
+
+# Custom port and endpoint
+npx excel-analyser-mcp streamableHttp 3000 /excel-mcp
+```
+
+**MCP Client Configuration (HTTP):**
+```json
+{
+  "mcpServers": {
+    "Excel Analyser MCP": {
+      "type": "http",
+      "url": "http://localhost:8080/mcp"
+    }
+  }
+}
+```
+
+### SSE Transport (Self-hosted)
+For real-time streaming applications (deprecated but still supported).
+
+**Start SSE Server:**
+```bash
+# Default: runs on http://localhost:8080/sse
+npx excel-analyser-mcp sse
+
+# Custom port and endpoint  
+npx excel-analyser-mcp sse 3000 /excel-sse
+```
+
+**MCP Client Configuration (SSE):**
+```json
+{
+  "mcpServers": {
+    "Excel Analyser MCP": {
+      "type": "sse", 
+      "url": "http://localhost:8080/sse"
+    }
+  }
+}
+```
+
+### Development Scripts (Self-hosted)
+```bash
+npm run start          # Default stdio transport
+npm run start:stdio    # Explicit stdio transport  
+npm run start:http     # HTTP transport on port 8080
+npm run start:sse      # SSE transport on port 8080
+```
+
+---
+
 ## What's New in v2.1.0
 - **🚀 Multi-Transport Support**: Now supports stdio (npm), HTTP streamable, and SSE transports for maximum flexibility
 - **🔗 HTTP Transport**: Perfect for web applications and REST API integrations  
@@ -356,81 +450,6 @@ If the file is large, the server will return a preview:
 
 ---
 
-## Configuration
-
-Excel Analyser MCP supports multiple transport protocols: **stdio** (npm/CLI), **HTTP streamable**, and **SSE**.
-
-### NPM/Stdio Transport (Default)
-Perfect for MCP clients like Claude Desktop, Cursor, and other CLI-based integrations.
-
-**mcp.json Configuration:**
-```json
-{
-  "mcpServers": {
-    "Excel Analyser MCP": {
-      "command": "npx",
-      "args": ["-y", "excel-analyser-mcp", "--stdio"]
-    }
-  }
-}
-```
-
-### HTTP Transport
-Ideal for web applications, REST API integrations, and serverless deployments.
-
-**Start HTTP Server:**
-```bash
-# Default: runs on http://localhost:8080/mcp
-npx excel-analyser-mcp streamableHttp
-
-# Custom port and endpoint
-npx excel-analyser-mcp streamableHttp 3000 /excel-mcp
-```
-
-**MCP Client Configuration (HTTP):**
-```json
-{
-  "mcpServers": {
-    "Excel Analyser MCP": {
-      "type": "http",
-      "url": "http://localhost:8080/mcp"
-    }
-  }
-}
-```
-
-### SSE Transport  
-For real-time streaming applications (deprecated but still supported).
-
-**Start SSE Server:**
-```bash
-# Default: runs on http://localhost:8080/sse
-npx excel-analyser-mcp sse
-
-# Custom port and endpoint  
-npx excel-analyser-mcp sse 3000 /excel-sse
-```
-
-**MCP Client Configuration (SSE):**
-```json
-{
-  "mcpServers": {
-    "Excel Analyser MCP": {
-      "type": "sse", 
-      "url": "http://localhost:8080/sse"
-    }
-  }
-}
-```
-
-### Development Scripts
-```bash
-npm run start          # Default stdio transport
-npm run start:stdio    # Explicit stdio transport  
-npm run start:http     # HTTP transport on port 8080
-npm run start:sse      # SSE transport on port 8080
-```
-
 ## 🚀 Cloud Deployment
 
 Deploy your MCP server to the internet so others can use it via HTTP transport!
@@ -537,4 +556,5 @@ If you find this project helpful, please consider:
 ---
 
 ## License
-ISC 
+ISC
+```
