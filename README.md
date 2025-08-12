@@ -29,6 +29,13 @@ The fastest way to get started! Use our deployed server without any installation
 
 🎉 **That's it!** No installation required. Start analyzing files immediately.
 
+**📝 Example Usage Prompt (HTTP - Use Cloud URLs):**
+```
+Please analyze the Excel file at https://github.com/contactakagrawal/excel-analyser-mcp/raw/main/tests/dummy_excel_file.xlsx and show me the first few rows and column names.
+```
+
+**⚠️ Important for HTTP:** Use **cloud URLs** (GitHub raw, Google Drive public links, etc.) since the server runs remotely and cannot access your local files.
+
 ### NPM/Stdio Transport (Self-hosted)
 Perfect for MCP clients like Claude Desktop, Cursor, and other CLI-based integrations.
 
@@ -43,6 +50,13 @@ Perfect for MCP clients like Claude Desktop, Cursor, and other CLI-based integra
   }
 }
 ```
+
+**📝 Example Usage Prompt (Stdio - Use Local Paths):**
+```
+Please analyze the Excel file at /Users/john/Documents/sales_data.xlsx and show me the first few rows and column names.
+```
+
+**⚠️ Important for Stdio:** Use **absolute local file paths** since the server runs on your machine and can access your local files directly.
 
 ### HTTP Transport (Self-hosted)
 Ideal for web applications, REST API integrations, and serverless deployments.
@@ -67,6 +81,13 @@ npx excel-analyser-mcp streamableHttp 3000 /excel-mcp
   }
 }
 ```
+
+**📝 Example Usage Prompt (Self-hosted HTTP - Use Local or Cloud URLs):**
+```
+Please analyze the Excel file at /Users/john/Documents/sales_data.xlsx and show me the first few rows and column names.
+```
+
+**⚠️ Important for Self-hosted HTTP:** You can use **local absolute paths** or **cloud URLs** since your server can access both local files and remote URLs.
 
 ### SSE Transport (Self-hosted)
 For real-time streaming applications (deprecated but still supported).
