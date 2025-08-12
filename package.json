@@ -1,15 +1,21 @@
 {
   "name": "excel-analyser-mcp",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "A Node.js tool to read and analyse Excel (.xlsx), CSV (.csv), and JSON (.json) files using MCP with automatic pagination support.",
   "main": "excel-analyser-mcp.js",
   "bin": {
     "excel-analyser-mcp": "./excel-analyser-mcp.js"
   },
   "scripts": {
-    "test": "node test-readExcelFile.js",
-    "test-json": "node test-readJsonFile.js",
-    "test-all": "node test-readExcelFile.js && node test-readJsonFile.js"
+    "test": "node tests/test-readExcelFile.js",
+    "test-json": "node tests/test-readJsonFile.js",
+    "test-http": "node tests/test-http-transport.js",
+    "test-deployment": "node tests/test-deployment.js",
+    "test-all": "node tests/test-readExcelFile.js && node tests/test-readJsonFile.js",
+    "start": "node excel-analyser-mcp.js",
+    "start:stdio": "node excel-analyser-mcp.js stdio",
+    "start:sse": "node excel-analyser-mcp.js sse",
+    "start:http": "node excel-analyser-mcp.js streamableHttp"
   },
   "keywords": [
     "excel",
@@ -29,7 +35,7 @@
     "url": "https://github.com/contactakagrawal/excel-analyser-mcp.git"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.8.0",
+    "@modelcontextprotocol/sdk": "^1.17.2",
     "csv-parse": "^5.5.4",
     "stream-chain": "^3.4.0",
     "stream-json": "^1.9.1",

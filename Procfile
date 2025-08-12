@@ -1,0 +1,1 @@
+web: node excel-analyser-mcp.js streamableHttp $PORT /mcp 

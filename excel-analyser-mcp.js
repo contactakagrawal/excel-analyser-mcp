@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { createServer } from 'http';
 import { z } from "zod";
 import XLSX from "xlsx";
 import { parse } from "csv-parse/sync";
@@ -13,10 +16,30 @@ const server = new McpServer({
   version: "1.0.0"
 });
 
+// Helper function to detect if a path is a URL
+const isUrl = (path) => {
+  try {
+    new URL(path);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// Helper function to fetch file from URL
+const fetchFileFromUrl = async (url) => {
+  console.error(`Fetching file from URL: ${url}`);
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+  }
+  return await response.arrayBuffer();
+};
+
 server.tool(
   "read_excel",
   {
-    filePath: z.string().describe("Path to the Excel or CSV file on disk (.xlsx or .csv)"),
+    filePath: z.string().describe("Path to Excel/CSV file on disk OR public URL (.xlsx or .csv). Examples: './data.xlsx', '/path/to/file.csv', 'https://example.com/data.xlsx'"),
     columns: z.array(z.string()).optional().describe("Columns to include in the output. If not specified, all columns are included.")
   },
   async ({ filePath, columns }) => {
@@ -30,20 +53,27 @@ server.tool(
           }]
         };
       }
-      // Read file from disk
-      const fs = await import('fs/promises');
-      // Check if file exists
-      try {
-        await fs.access(filePath);
-      } catch {
-        return {
-          content: [{
-            type: "text",
-            text: `File does not exist: ${filePath}`
-          }]
-        };
+      // Read file (local or URL)
+      let buffer;
+      
+      if (isUrl(filePath)) {
+        // Fetch from URL
+        buffer = Buffer.from(await fetchFileFromUrl(filePath));
+      } else {
+        // Read local file
+        const fs = await import('fs/promises');
+        try {
+          await fs.access(filePath);
+          buffer = await fs.readFile(filePath);
+        } catch {
+          return {
+            content: [{
+              type: "text",
+              text: `File does not exist: ${filePath}. For cloud files, use public URLs like 'https://example.com/file.xlsx'`
+            }]
+          };
+        }
       }
-      const buffer = await fs.readFile(filePath);
       const CHUNK_SIZE = 20000;
       const result = {};
       if (filePath.endsWith('.xlsx')) {
@@ -123,7 +153,7 @@ server.tool(
 server.tool(
   "get_chunk",
   {
-    filePath: z.string().describe("Path to the Excel or CSV file on disk (.xlsx or .csv)"),
+    filePath: z.string().describe("Path to Excel/CSV file on disk OR public URL (.xlsx or .csv). Examples: './data.xlsx', '/path/to/file.csv', 'https://example.com/data.xlsx'"),
     columns: z.array(z.string()).optional().describe("Columns to include in the output. If not specified, all columns are included."),
     start: z.number().int().nonnegative().default(0).describe("Row index to start from (0-based)"),
     limit: z.number().int().positive().default(1000).describe("Number of rows to return in the chunk (default 1000)"),
@@ -146,18 +176,27 @@ server.tool(
           }]
         };
       }
-      const fs = await import('fs/promises');
-      try {
-        await fs.access(filePath);
-      } catch {
-        return {
-          content: [{
-            type: "text",
-            text: `File does not exist: ${filePath}`
-          }]
-        };
+      // Read file (local or URL)
+      let buffer;
+      
+      if (isUrl(filePath)) {
+        // Fetch from URL
+        buffer = Buffer.from(await fetchFileFromUrl(filePath));
+      } else {
+        // Read local file
+        const fs = await import('fs/promises');
+        try {
+          await fs.access(filePath);
+          buffer = await fs.readFile(filePath);
+        } catch {
+          return {
+            content: [{
+              type: "text",
+              text: `File does not exist: ${filePath}. For cloud files, use public URLs like 'https://example.com/file.xlsx'`
+            }]
+          };
+        }
       }
-      const buffer = await fs.readFile(filePath);
       let data = [];
       if (filePath.endsWith('.xlsx')) {
         const XLSX = (await import('xlsx')).default;
@@ -211,7 +250,7 @@ server.tool(
 server.tool(
   "read_json",
   {
-    filePath: z.string().describe("Path to the JSON file on disk (.json)"),
+    filePath: z.string().describe("Path to JSON file on disk OR public URL (.json). Examples: './data.json', '/path/to/file.json', 'https://example.com/data.json'"),
     fields: z.array(z.string()).optional().describe("Fields to include in the output. If not specified, all fields are included.")
   },
   async ({ filePath, fields }) => {
@@ -227,16 +266,34 @@ server.tool(
         };
       }
       
-      // Check if file exists
-      try {
-        await fs.promises.access(filePath);
-      } catch {
-        return {
-          content: [{
-            type: "text",
-            text: `File does not exist: ${filePath}`
-          }]
-        };
+      // Create readable stream (local file or URL)
+      let readableStream;
+      
+      if (isUrl(filePath)) {
+        // Fetch from URL and create stream
+        const response = await fetch(filePath);
+        if (!response.ok) {
+          return {
+            content: [{
+              type: "text",
+              text: `Failed to fetch URL: ${response.status} ${response.statusText}`
+            }]
+          };
+        }
+        readableStream = response.body;
+      } else {
+        // Check if local file exists
+        try {
+          await fs.promises.access(filePath);
+          readableStream = fs.createReadStream(filePath);
+        } catch {
+          return {
+            content: [{
+              type: "text",
+              text: `File does not exist: ${filePath}. For cloud files, use public URLs like 'https://example.com/file.json'`
+            }]
+          };
+        }
       }
 
       const dataPromise = new Promise((resolve, reject) => {
@@ -246,7 +303,7 @@ server.tool(
         const PREVIEW_LIMIT = 100;
 
         const pipeline = chain([
-            fs.createReadStream(filePath),
+            readableStream,
             new parser(),
             new streamArray()
         ]);
@@ -677,8 +734,134 @@ export async function readJsonFile(filePath, fields) {
 }
 
 async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  const args = process.argv.slice(2);
+  const transportType = args[0] || 'stdio';
+  
+  switch (transportType) {
+    case 'stdio':
+      const stdioTransport = new StdioServerTransport();
+      console.error('Excel Analyser MCP server running on stdio');
+      await server.connect(stdioTransport);
+      break;
+      
+    case 'sse':
+      const ssePort = parseInt(args[1]) || 8080;
+      const sseEndpoint = args[2] || '/sse';
+      const sseTransport = new SSEServerTransport(sseEndpoint, { port: ssePort });
+      console.error(`Excel Analyser MCP server running on SSE at http://localhost:${ssePort}${sseEndpoint}`);
+      await server.connect(sseTransport);
+      break;
+      
+    case 'streamableHttp':
+    case 'stream':
+      const httpPort = parseInt(args[1]) || parseInt(process.env.PORT) || 8080;
+      const httpEndpoint = args[2] || '/mcp';
+      
+      // Create HTTP transport with session management
+      const httpTransport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => Math.random().toString(36).substring(2, 15),
+      });
+      
+      // Create HTTP server
+      const httpServer = createServer(async (req, res) => {
+        // Enable CORS
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Mcp-Session-Id');
+        
+        if (req.method === 'OPTIONS') {
+          res.writeHead(200);
+          res.end();
+          return;
+        }
+        
+        // Health check endpoint
+        if (req.url === '/health' || req.url === '/') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ 
+            status: 'healthy', 
+            service: 'Excel Analyser MCP',
+            version: '2.1.0',
+            endpoints: {
+              mcp: httpEndpoint,
+              health: '/health',
+              upload: '/upload'
+            },
+            usage: {
+              description: 'Excel Analyser MCP Server - Analyze Excel, CSV, and JSON files',
+              documentation: 'https://github.com/contactakagrawal/excel-analyser-mcp#readme',
+              mcpConnection: `Connect your MCP client to: ${req.headers.host}${httpEndpoint}`
+            }
+          }));
+          return;
+        }
+        
+        // File upload endpoint for web-based usage
+        if (req.url === '/upload' && req.method === 'POST') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            message: 'File upload endpoint - Implementation depends on your storage needs',
+            suggestion: 'For production, consider using cloud storage (AWS S3, etc.) or base64 encoding in MCP tool calls'
+          }));
+          return;
+        }
+        
+        // Only handle requests to our MCP endpoint
+        if (req.url === httpEndpoint) {
+          if (req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => body += chunk);
+            req.on('end', async () => {
+              try {
+                const parsedBody = JSON.parse(body);
+                await httpTransport.handleRequest(req, res, parsedBody);
+              } catch (error) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Invalid JSON' }));
+              }
+            });
+          } else if (req.method === 'GET' || req.method === 'DELETE') {
+            await httpTransport.handleRequest(req, res);
+          } else {
+            res.writeHead(405);
+            res.end('Method Not Allowed');
+          }
+        } else {
+          res.writeHead(404);
+          res.end('Not Found');
+        }
+      });
+      
+      // Start HTTP server
+      await new Promise((resolve, reject) => {
+        httpServer.listen(httpPort, '0.0.0.0', (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+      
+      const serverUrl = process.env.RAILWAY_STATIC_URL 
+        ? `https://${process.env.RAILWAY_STATIC_URL}${httpEndpoint}`
+        : `http://localhost:${httpPort}${httpEndpoint}`;
+      
+      console.error(`Excel Analyser MCP server running on HTTP at ${serverUrl}`);
+      
+      // Handle server errors
+      httpServer.on('error', (error) => {
+        console.error('HTTP Server error:', error);
+      });
+      
+      // Connect the MCP server to the transport
+      await server.connect(httpTransport);
+      break;
+      
+    default:
+      console.error('Usage: excel-analyser-mcp [stdio|sse|streamableHttp] [port] [endpoint]');
+      console.error('  stdio - Use stdio transport (default)');
+      console.error('  sse <port> <endpoint> - Use SSE transport (default: port 8080, endpoint /sse)');
+      console.error('  streamableHttp <port> <endpoint> - Use HTTP transport (default: port 8080, endpoint /mcp)');
+      process.exit(1);
+  }
 }
 
 main().catch(console.error);

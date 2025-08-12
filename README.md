@@ -6,13 +6,20 @@
 [![License](https://img.shields.io/badge/license-ISC-blue.svg)](https://github.com/contactakagrawal/excel-analyser-mcp/blob/main/LICENSE)
 [![MCP Server](https://img.shields.io/badge/MCP-Server-green.svg)](https://lobehub.com)
 
-A Node.js MCP server for reading and analyzing Excel (.xlsx), CSV (.csv), and JSON (.json) files. Designed for scalable, chunked, and column/field-specific data access, making it ideal for AI agents and automation workflows that need to process large datasets efficiently.
+A Node.js MCP server for reading and analyzing Excel (.xlsx), CSV (.csv), and JSON (.json) files. Supports **multiple transport protocols** (stdio, HTTP, SSE) and designed for scalable, chunked, and column/field-specific data access, making it ideal for AI agents and automation workflows that need to process large datasets efficiently.
+
+## What's New in v2.1.0
+- **🚀 Multi-Transport Support**: Now supports stdio (npm), HTTP streamable, and SSE transports for maximum flexibility
+- **🔗 HTTP Transport**: Perfect for web applications and REST API integrations  
+- **📡 SSE Transport**: Real-time streaming capabilities for advanced use cases
+- **⚙️ Easy Configuration**: Simple command-line arguments to choose your preferred transport
 
 ## What's New in v2.0.0
 - **New `query_json` Tool**: A powerful new tool for efficiently searching large JSON files based on field values.
 - **Efficient Streaming**: All JSON tools (`read_json`, `query_json`, `get_json_chunk`) have been re-architected to use streaming. This means they can process gigabyte-sized files with minimal memory usage, preventing crashes and ensuring scalability.
 
 ## Features
+- **Multi-Transport Support**: Choose between stdio (npm), HTTP streamable, or SSE transports
 - **Read Excel/CSV/JSON files** and output all or selected columns/fields as JSON
 - **Efficient Streaming**: Handle multi-gigabyte JSON files with constant, low memory usage.
 - **Powerful JSON Querying**: Quickly search and filter large JSON files without loading the entire file into memory.
@@ -349,9 +356,14 @@ If the file is large, the server will return a preview:
 
 ---
 
-## Example: mcp.json Configuration
-To use this server with an MCP-compatible agent, add the following to your `mcp.json`:
+## Configuration
 
+Excel Analyser MCP supports multiple transport protocols: **stdio** (npm/CLI), **HTTP streamable**, and **SSE**.
+
+### NPM/Stdio Transport (Default)
+Perfect for MCP clients like Claude Desktop, Cursor, and other CLI-based integrations.
+
+**mcp.json Configuration:**
 ```json
 {
   "mcpServers": {
@@ -362,6 +374,92 @@ To use this server with an MCP-compatible agent, add the following to your `mcp.
   }
 }
 ```
+
+### HTTP Transport
+Ideal for web applications, REST API integrations, and serverless deployments.
+
+**Start HTTP Server:**
+```bash
+# Default: runs on http://localhost:8080/mcp
+npx excel-analyser-mcp streamableHttp
+
+# Custom port and endpoint
+npx excel-analyser-mcp streamableHttp 3000 /excel-mcp
+```
+
+**MCP Client Configuration (HTTP):**
+```json
+{
+  "mcpServers": {
+    "Excel Analyser MCP": {
+      "type": "http",
+      "url": "http://localhost:8080/mcp"
+    }
+  }
+}
+```
+
+### SSE Transport  
+For real-time streaming applications (deprecated but still supported).
+
+**Start SSE Server:**
+```bash
+# Default: runs on http://localhost:8080/sse
+npx excel-analyser-mcp sse
+
+# Custom port and endpoint  
+npx excel-analyser-mcp sse 3000 /excel-sse
+```
+
+**MCP Client Configuration (SSE):**
+```json
+{
+  "mcpServers": {
+    "Excel Analyser MCP": {
+      "type": "sse", 
+      "url": "http://localhost:8080/sse"
+    }
+  }
+}
+```
+
+### Development Scripts
+```bash
+npm run start          # Default stdio transport
+npm run start:stdio    # Explicit stdio transport  
+npm run start:http     # HTTP transport on port 8080
+npm run start:sse      # SSE transport on port 8080
+```
+
+## 🚀 Cloud Deployment
+
+Deploy your MCP server to the internet so others can use it via HTTP transport!
+
+### Quick Deploy to Railway
+1. **Fork/clone** this repository
+2. **Connect to Railway**: [railway.app](https://railway.app) → New Project → Deploy from GitHub
+3. **Access your server**: `https://your-app.railway.app/mcp`
+
+### Use Your Deployed Server
+```json
+{
+  "mcpServers": {
+    "Excel Analyser MCP (Cloud)": {
+      "type": "http", 
+      "url": "https://your-app.railway.app/mcp"
+    }
+  }
+}
+```
+
+📖 **Full deployment guide**: See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for detailed instructions, security considerations, and alternative platforms.
+
+## 📚 Documentation
+
+Additional documentation is available in the `docs/` directory:
+
+- `docs/DEPLOYMENT.md` - Complete deployment guide for Railway and other cloud platforms
+- `docs/URL_SUPPORT.md` - Guide for adding URL support to handle cloud-based file access
 
 ---
 
@@ -377,16 +475,28 @@ To use this server with an MCP-compatible agent, add the following to your `mcp.
 
 ## Testing
 
-The project includes test files for both Excel/CSV and JSON functionality:
+The project includes test files for both Excel/CSV and JSON functionality in the `tests/` directory:
 
-- `test-readExcelFile.js` - Test Excel/CSV reading functionality
-- `test-readJsonFile.js` - Test JSON reading functionality
-- `test-data.json` - Sample JSON file for testing
+- `tests/test-readExcelFile.js` - Test Excel/CSV reading functionality
+- `tests/test-readJsonFile.js` - Test JSON reading functionality  
+- `tests/test-http-transport.js` - Test HTTP transport connectivity
+- `tests/test-deployment.js` - Test deployed server functionality
+- `tests/test-data.json` - Sample JSON file for testing
+- `tests/dummy_excel_file.xlsx` - Sample Excel file for testing
 
 To run tests:
 ```bash
-node test-readExcelFile.js
-node test-readJsonFile.js
+# Test file processing
+npm test                    # Excel/CSV test
+npm run test-json          # JSON test
+npm run test-all           # All file processing tests
+
+# Test HTTP transport (requires server running)
+npm run start:http         # Terminal 1: Start HTTP server
+npm run test-http          # Terminal 2: Test HTTP connectivity
+
+# Test deployed server
+npm run test-deployment https://your-deployed-url.com
 ```
 
 ---

@@ -1,10 +1,10 @@
-import { readJsonFile } from './excel-analyser-mcp.js';
+import { readJsonFile } from '../excel-analyser-mcp.js';
 
 async function testReadJsonFile() {
   console.log('Testing readJsonFile function...');
   
   // Test with a sample JSON file (you can replace this path with an actual file)
-  const testFilePath = './test-data.json';
+  const testFilePath = './tests/test-data.json';
   
   try {
     const result = await readJsonFile(testFilePath);
