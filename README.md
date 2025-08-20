@@ -45,7 +45,7 @@ Perfect for MCP clients like Claude Desktop, Cursor, and other CLI-based integra
   "mcpServers": {
     "Excel Analyser MCP": {
       "command": "npx",
-      "args": ["-y", "excel-analyser-mcp", "--stdio"]
+      "args": ["-y", "excel-analyser-mcp"]
     }
   }
 }
@@ -578,4 +578,3 @@ If you find this project helpful, please consider:
 
 ## License
 ISC
-```
