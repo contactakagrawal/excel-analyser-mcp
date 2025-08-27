@@ -10,6 +10,7 @@ import { parse } from "csv-parse/sync";
 import { chain } from 'stream-chain';
 import parser from 'stream-json/Parser.js';
 import streamArray from 'stream-json/streamers/StreamArray.js';
+import path from 'path';
 
 const server = new McpServer({
   name: "ExcelAnalyser",
@@ -63,8 +64,9 @@ server.tool(
         // Read local file
         const fs = await import('fs/promises');
         try {
-          await fs.access(filePath);
-          buffer = await fs.readFile(filePath);
+          const normalizedPath = path.normalize(filePath);
+          await fs.access(normalizedPath);
+          buffer = await fs.readFile(normalizedPath);
         } catch {
           return {
             content: [{
@@ -186,8 +188,9 @@ server.tool(
         // Read local file
         const fs = await import('fs/promises');
         try {
-          await fs.access(filePath);
-          buffer = await fs.readFile(filePath);
+          const normalizedPath = path.normalize(filePath);
+          await fs.access(normalizedPath);
+          buffer = await fs.readFile(normalizedPath);
         } catch {
           return {
             content: [{
@@ -284,8 +287,9 @@ server.tool(
       } else {
         // Check if local file exists
         try {
-          await fs.promises.access(filePath);
-          readableStream = fs.createReadStream(filePath);
+          const normalizedPath = path.normalize(filePath);
+          await fs.promises.access(normalizedPath);
+          readableStream = fs.createReadStream(normalizedPath);
         } catch {
           return {
             content: [{
@@ -383,14 +387,15 @@ server.tool(
         return { content: [{ type: "text", text: `Only .json files are supported. Provided: ${filePath}` }] };
       }
       
-      await fs.promises.access(filePath);
+      const normalizedPath = path.normalize(filePath);
+      await fs.promises.access(normalizedPath);
 
       const dataPromise = new Promise((resolve, reject) => {
         const results = [];
         let totalEntries = 0;
 
         const pipeline = chain([
-            fs.createReadStream(filePath),
+            fs.createReadStream(normalizedPath),
             new parser(),
             new streamArray()
         ]);
@@ -488,14 +493,15 @@ server.tool(
         };
       }
       
-      await fs.promises.access(filePath);
+      const normalizedPath = path.normalize(filePath);
+      await fs.promises.access(normalizedPath);
       
       const dataPromise = new Promise((resolve, reject) => {
         const chunk = [];
         let totalEntries = 0;
 
         const pipeline = chain([
-            fs.createReadStream(filePath),
+            fs.createReadStream(normalizedPath),
             new parser(),
             new streamArray()
         ]);
@@ -562,8 +568,11 @@ export async function readExcelFile(filePath, columns) {
       };
     }
     const fs = await import('fs/promises');
+    const normalizedPath = path.normalize(filePath);
+    let buffer;
     try {
-      await fs.access(filePath);
+      await fs.access(normalizedPath);
+      buffer = await fs.readFile(normalizedPath);
     } catch {
       return {
         content: [{
@@ -572,7 +581,7 @@ export async function readExcelFile(filePath, columns) {
         }]
       };
     }
-    const buffer = await fs.readFile(filePath);
+    
     const CHUNK_SIZE = 20000;
     const result = {};
     if (filePath.endsWith('.xlsx')) {
@@ -644,6 +653,7 @@ export async function readExcelFile(filePath, columns) {
 
 export async function readJsonFile(filePath, fields) {
   const fs = await import('fs');
+  const normalizedPath = path.normalize(filePath);
   try {
     if (!filePath.endsWith('.json')) {
       return {
@@ -655,7 +665,7 @@ export async function readJsonFile(filePath, fields) {
     }
     
     try {
-      await fs.promises.access(filePath);
+      await fs.promises.access(normalizedPath);
     } catch {
       return {
         content: [{
@@ -672,7 +682,7 @@ export async function readJsonFile(filePath, fields) {
       const PREVIEW_LIMIT = 100;
 
       const pipeline = chain([
-          fs.createReadStream(filePath),
+          fs.createReadStream(normalizedPath),
           new parser(),
           new streamArray()
       ]);
