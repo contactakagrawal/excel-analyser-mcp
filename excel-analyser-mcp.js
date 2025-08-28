@@ -11,6 +11,7 @@ import { chain } from 'stream-chain';
 import parser from 'stream-json/Parser.js';
 import streamArray from 'stream-json/streamers/StreamArray.js';
 import path from 'path';
+import pkg from './package.json' assert { type: 'json' };
 
 const server = new McpServer({
   name: "ExcelAnalyser",
@@ -64,9 +65,10 @@ server.tool(
         // Read local file
         const fs = await import('fs/promises');
         try {
-          const normalizedPath = path.normalize(filePath);
-          await fs.access(normalizedPath);
-          buffer = await fs.readFile(normalizedPath);
+          const cleanPath = filePath.trim().replace(/^['"]|['"]$/g, '');
+          const resolvedPath = path.resolve(cleanPath);
+          await fs.access(resolvedPath);
+          buffer = await fs.readFile(resolvedPath);
         } catch {
           return {
             content: [{
@@ -188,9 +190,10 @@ server.tool(
         // Read local file
         const fs = await import('fs/promises');
         try {
-          const normalizedPath = path.normalize(filePath);
-          await fs.access(normalizedPath);
-          buffer = await fs.readFile(normalizedPath);
+          const cleanPath = filePath.trim().replace(/^['"]|['"]$/g, '');
+          const resolvedPath = path.resolve(cleanPath);
+          await fs.access(resolvedPath);
+          buffer = await fs.readFile(resolvedPath);
         } catch {
           return {
             content: [{
@@ -287,9 +290,10 @@ server.tool(
       } else {
         // Check if local file exists
         try {
-          const normalizedPath = path.normalize(filePath);
-          await fs.promises.access(normalizedPath);
-          readableStream = fs.createReadStream(normalizedPath);
+          const cleanPath = filePath.trim().replace(/^['"]|['"]$/g, '');
+          const resolvedPath = path.resolve(cleanPath);
+          await fs.promises.access(resolvedPath);
+          readableStream = fs.createReadStream(resolvedPath);
         } catch {
           return {
             content: [{
@@ -387,15 +391,16 @@ server.tool(
         return { content: [{ type: "text", text: `Only .json files are supported. Provided: ${filePath}` }] };
       }
       
-      const normalizedPath = path.normalize(filePath);
-      await fs.promises.access(normalizedPath);
+      const cleanPath = filePath.trim().replace(/^['"]|['"]$/g, '');
+      const resolvedPath = path.resolve(cleanPath);
+      await fs.promises.access(resolvedPath);
 
       const dataPromise = new Promise((resolve, reject) => {
         const results = [];
         let totalEntries = 0;
 
         const pipeline = chain([
-            fs.createReadStream(normalizedPath),
+            fs.createReadStream(resolvedPath),
             new parser(),
             new streamArray()
         ]);
@@ -493,15 +498,16 @@ server.tool(
         };
       }
       
-      const normalizedPath = path.normalize(filePath);
-      await fs.promises.access(normalizedPath);
+      const cleanPath = filePath.trim().replace(/^['"]|['"]$/g, '');
+      const resolvedPath = path.resolve(cleanPath);
+      await fs.promises.access(resolvedPath);
       
       const dataPromise = new Promise((resolve, reject) => {
         const chunk = [];
         let totalEntries = 0;
 
         const pipeline = chain([
-            fs.createReadStream(normalizedPath),
+            fs.createReadStream(resolvedPath),
             new parser(),
             new streamArray()
         ]);
@@ -744,6 +750,7 @@ export async function readJsonFile(filePath, fields) {
 }
 
 async function main() {
+  console.error(`Excel Analyser MCP v${pkg.version}`);
   const args = process.argv.slice(2);
   const transportType = args[0] || 'stdio';
   
