@@ -20,11 +20,10 @@ const server = new McpServer({
   version: "1.0.0"
 });
 
-// Helper function to detect if a path is a URL
 const isUrl = (path) => {
   try {
-    new URL(path);
-    return true;
+    const url = new URL(path);
+    return url.protocol === 'http:' || url.protocol === 'https:';
   } catch {
     return false;
   }
