@@ -11,7 +11,9 @@ import { chain } from 'stream-chain';
 import parser from 'stream-json/Parser.js';
 import streamArray from 'stream-json/streamers/StreamArray.js';
 import path from 'path';
-import pkg from './package.json' assert { type: 'json' };
+import { readFileSync } from 'fs';
+
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url)));
 
 const server = new McpServer({
   name: "ExcelAnalyser",
